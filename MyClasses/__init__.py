@@ -54,36 +54,36 @@ class VideoIndexer():
         if not self.access_token:
             self.get_access_token()
 
-    def upload_to_video_indexer(self, video_url, video_name, video_language='English'):
-        self.check_access_token()
+    # def upload_to_video_indexer(self, video_url, video_name, video_language='English'):
+    #     self.check_access_token()
 
-        logging.info('Uploading video to video indexer...')
+    #     logging.info('Uploading video to video indexer...')
         
-        ## Get SAS URL
-        sasURL = get_SAS_URL(fileURL=video_url,
-                             block_blob_service=self.block_blob_service,
-                             container=self.container_source)
+    #     ## Get SAS URL
+    #     sasURL = get_SAS_URL(fileURL=video_url,
+    #                          block_blob_service=self.block_blob_service,
+    #                          container=self.container_source)
         
-        params = {
-            'streamingPreset': 'Default',
-            'indexingPreset': 'DefaultWithNoiseReduction',
-            'language': video_language,
-            'name': video_name,
-            'accessToken': self.access_token,
-            'videoUrl' : sasURL,
-            'callbackUrl' : "https://futuresvideoindexerresultsdownloader.azurewebsites.net/api/HttpTrigger"
-        }
+    #     params = {
+    #         'streamingPreset': 'Default',
+    #         'indexingPreset': 'DefaultWithNoiseReduction',
+    #         'language': video_language,
+    #         'name': video_name,
+    #         'accessToken': self.access_token,
+    #         'videoUrl' : sasURL,
+    #         'callbackUrl' : "https://futuresvideoindexerresultsdownloader.azurewebsites.net/api/HttpTrigger"
+    #     }
 
-        request_url = 'https://api.videoindexer.ai/{loc}/Accounts/{acc_id}/Videos'.format(
-                                            loc=self.vi_location,
-                                            acc_id=self.vi_account_id
-                                        )
+    #     request_url = 'https://api.videoindexer.ai/{loc}/Accounts/{acc_id}/Videos'.format(
+    #                                         loc=self.vi_location,
+    #                                         acc_id=self.vi_account_id
+    #                                     )
         
-        upload_video_req = self.do_requesting(request_url=request_url,
-                                              params=params)
+    #     upload_video_req = self.do_requesting(request_url=request_url,
+    #                                           params=params)
         
 
-        return upload_video_req
+    #     return upload_video_req
     
     def get_info_back(self, videoID, _type_):
         self.check_access_token()
