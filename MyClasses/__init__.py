@@ -1,7 +1,6 @@
 import re
 import time
 import requests
-from azure.storage.blob import ContainerPermissions
 from datetime import datetime, timedelta
 import logging
 
@@ -13,25 +12,13 @@ def get_retry_after_from_message(message):
 
     return 30  # default to retry in 30 seconds
 
-def get_SAS_URL(fileURL,
-                block_blob_service,
-                container):
-
-    sasTokenRead = block_blob_service.generate_container_shared_access_signature(
-    container_name=container,
-    permission=ContainerPermissions.READ,
-    expiry=datetime.utcnow() + timedelta(days=1)
-    )
-    return f"{fileURL}?{sasTokenRead}"
-
-
 class VideoIndexer():
     def __init__(self,
                  vi_subscription_key,
                  vi_location,
                  vi_account_id,
-                 block_blob_service,
-                 container_source):
+                 block_blob_service=None,
+                 container_source=None):
         self.vi_subscription_key = vi_subscription_key
         self.vi_location = vi_location
         self.vi_account_id = vi_account_id
@@ -61,10 +48,7 @@ class VideoIndexer():
         logging.info('Access Token: {}'.format(access_token))
         self.access_token = access_token
         return access_token
-    def get_SAS_URL_method(self,fileURL):
-        return get_SAS_URL(fileURL=fileURL,
-                           block_blob_service=self.block_blob_service,
-                           container=self.container_source)
+        
 
     def check_access_token(self):
         if not self.access_token:

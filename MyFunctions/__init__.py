@@ -1,4 +1,7 @@
 from datetime import datetime, timedelta
+import os
+import pyodbc
+import logging
 
 def sqlise_tl(
     transcript_list,
@@ -20,9 +23,9 @@ def sqlise_tl(
             ## DateTime of when it was added
             videoAdded,
             ## Accuracy
-            el['confidence'],
+            float(el['confidence']),
             ## Text
-            el['text']
+            el['text'].replace("'","''")
         ]
         for inst in el['instances']:
             ## Loop through all the instances of that block of text
@@ -32,7 +35,7 @@ def sqlise_tl(
                 adjust_time(
                     time=inst['start'],
                     vidNumber=videoNumber
-                )
+                ),
                 ## End time (of text mention)
                 adjust_time(
                     time=inst['end'],
@@ -47,33 +50,55 @@ def sqlise_tl(
 def SQLise_list(
     listOfValues
 ):
-    pass
-
-def readyForSQL(
-    readyForSQL
-):
-    Q = """
-INSERT INTO REPLACE_ME
-(VideoName, OriginalVideoName, DateTimeAdded, Accuracy, TextStartTime, TextEndTime, Text)
-VALUES
-
-
-
-    """
-
+    ## Do the appropriate formating (mostly adding "'" to start and end)
+    _list_ = [
+        ## Video name
+        f"'{listOfValues[0]}'",
+        ## Original video name - Video name without our “1ofX” add-on
+        f"'{listOfValues[1]}'",
+        ## DateTime of when it was added
+        f"""'{listOfValues[2].split(".")[0]}.{listOfValues[2].split(".")[1][:3]}'""",
+        ## Accuracy
+        str(listOfValues[3]),
+        ## Text
+        f"'{listOfValues[4]}'",
+        ## Start time (of text mention)
+        f"'{listOfValues[5]}'",
+        ## End time (of text mention)
+        f"'{listOfValues[6]}'",
+    ]
+    ## Join with commas
+    return ",".join(_list_)
 
 def adjust_time(
     time,
     vidNumber
 ):
+    if time == '0:00:00':
+        _format_ = '%H:%M:%S'
+    else:
+        _format_ = '%H:%M:%S.%f'
     ## Get string into datetime object
-    timeDT = datetime.strptime(time,'%H:%M:%S.%f')
+    timeDT = datetime.strptime(time,_format_)
     ## Add appropriate hours
     newTimeDT = timeDT + timedelta(hours=vidNumber-1)
     ## Get object back into string, trim off extra 4 microseconds digits
     returnMe = datetime.strftime(newTimeDT,'%H:%M:%S.%f')[:-4]
 
     return returnMe
+
+def create_sql_query(
+    readyForSQL
+):
+    seperator = ')\n,('
+    Q = f"""
+INSERT INTO VideoIndexerTranscripts
+(VideoName, OriginalVideoName, DateTimeAdded, Accuracy, Text, TextStartTime, TextEndTime)
+VALUES
+({seperator.join(readyForSQL)})
+    """
+
+    return Q
 
 def get_vid_name_info(
     videoName
@@ -103,7 +128,22 @@ def get_vid_name_info(
 
     return origVideoName,videoNumber
 
+def run_sql_query(query):
 
+    ## Get information used to create connection string
+    username = 'matt.shepherd'
+    password = os.getenv("sqlPassword")
+    driver = '{ODBC Driver 17 for SQL Server}'
+    server = os.getenv("sqlServer")
+    database = 'AzureCognitive'
+    ## Create connection string
+    connectionString = f'DRIVER={driver};SERVER={server};PORT=1433;DATABASE={database};UID={username};PWD={password}'
+    ## Execute query
+    with pyodbc.connect(connectionString) as conn:
+        with conn.cursor() as cursor:
+            logging.info("About to execute 'INSERT' query")
+            cursor.execute(query)
+            logging.info("'INSERT' query executed")
 
 def representsInt(s):
     try: 

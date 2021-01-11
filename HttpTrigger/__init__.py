@@ -2,7 +2,9 @@ import logging
 import requests
 import azure.functions as func
 import json
-
+from MyFunctions import get_vid_name_info, sqlise_tl, create_sql_query, run_sql_query
+from MyClasses import VideoIndexer
+import os
 
 def main(req: func.HttpRequest) -> func.HttpResponse:
     logging.info('Python HTTP trigger function processed a request.')
@@ -18,9 +20,7 @@ def main(req: func.HttpRequest) -> func.HttpResponse:
         vi = VideoIndexer(
             vi_subscription_key=os.getenv("SUBSCRIPTION_KEY"),
             vi_location=os.getenv('LOCATION'),
-            vi_account_id=os.getenv('ACCOUNT_ID'),
-            block_blob_service=bbs,
-            container_source=containerInput
+            vi_account_id=os.getenv('ACCOUNT_ID')
         )
         ## Get base URL and params needed to make a requests
         url,params = vi.get_urlBase_and_params()
@@ -43,3 +43,7 @@ def main(req: func.HttpRequest) -> func.HttpResponse:
         )
         ## Create SQL query to run
         sqlQuery = create_sql_query(readyForSQL=listOfStringRows)
+        ## Run (INSERT) query
+        run_sql_query(sqlQuery)
+
+        return f"{len(listOfStringRows)} rows uploaded"
