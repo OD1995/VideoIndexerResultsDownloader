@@ -79,7 +79,10 @@ def adjust_time(
     else:
         _format_ = '%H:%M:%S.%f'
     ## Get string into datetime object
-    timeDT = datetime.strptime(time,_format_)
+    try:
+        timeDT = datetime.strptime(time,_format_)
+    except ValueError:
+        timeDT = datetime.strptime(time,'%H:%M:%S')
     ## Add appropriate hours
     newTimeDT = timeDT + timedelta(hours=vidNumber-1)
     ## Get object back into string, trim off extra 4 microseconds digits

@@ -11,10 +11,12 @@ def main(req: func.HttpRequest) -> func.HttpResponse:
 
     videoID = req.params.get('id')
     videoState = req.params.get('state')
+    logging.info(f"videoID: {videoID}")
+    logging.info(f"videoState: {videoState}")
     
     ## Only do stuff if the video has been processed
-    if videoState != "Processed ":
-        pass
+    if videoState != "Processed":
+        logging.info("File not processed")
     else:
         ## Create VideoIndexer object
         vi = VideoIndexer(
@@ -26,6 +28,7 @@ def main(req: func.HttpRequest) -> func.HttpResponse:
         url,params = vi.get_urlBase_and_params()
         ## Make request
         r = requests.get(f"{url}/Videos/{videoID}/Index",params=params)
+        logging.info("request made")
         ## Get response
         js = json.loads(r.text)
         ## Get info from json
@@ -41,9 +44,10 @@ def main(req: func.HttpRequest) -> func.HttpResponse:
             videoAdded=videoAdded,
             videoNumber=videoNumber
         )
+        logging.info("listOfStringRows created")
         ## Create SQL query to run
         sqlQuery = create_sql_query(readyForSQL=listOfStringRows)
+        logging.info("sqlQuery created")
         ## Run (INSERT) query
         run_sql_query(sqlQuery)
-
-        return f"{len(listOfStringRows)} rows uploaded"
+        logging.info("sqlQuery run")
