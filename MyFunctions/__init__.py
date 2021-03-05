@@ -2,6 +2,7 @@ from datetime import datetime, timedelta
 import os
 import pyodbc
 import logging
+import pandas as pd
 
 def sqlise_tl(
     transcript_list,
@@ -82,7 +83,11 @@ def adjust_time(
     try:
         timeDT = datetime.strptime(time,_format_)
     except ValueError:
-        timeDT = datetime.strptime(time,'%H:%M:%S')
+        if "." in time:
+            time2 = "".join(time.split(".")[:-1])
+        else:
+            time2 = time
+        timeDT = datetime.strptime(time2,'%H:%M:%S')
     ## Add appropriate hours
     newTimeDT = timeDT + timedelta(hours=vidNumber-1)
     ## Get object back into string, trim off extra 4 microseconds digits
@@ -131,8 +136,8 @@ def get_vid_name_info(
 
     return origVideoName,videoNumber
 
-def run_sql_query(query):
 
+def get_connection_string():
     ## Get information used to create connection string
     username = 'matt.shepherd'
     password = os.getenv("sqlPassword")
@@ -140,7 +145,11 @@ def run_sql_query(query):
     server = os.getenv("sqlServer")
     database = 'AzureCognitive'
     ## Create connection string
-    connectionString = f'DRIVER={driver};SERVER={server};PORT=1433;DATABASE={database};UID={username};PWD={password}'
+    return f'DRIVER={driver};SERVER={server};PORT=1433;DATABASE={database};UID={username};PWD={password}'
+
+def run_sql_query(query):
+    connectionString = get_connection_string()
+    logging.info(f"connectionString: {connectionString}")
     ## Execute query
     with pyodbc.connect(connectionString) as conn:
         with conn.cursor() as cursor:
@@ -148,9 +157,33 @@ def run_sql_query(query):
             cursor.execute(query)
             logging.info("'INSERT' query executed")
 
+def get_VideoIndexerIDs_dict():
+    connectionString = get_connection_string()
+    with pyodbc.connect(connectionString) as conn:
+        ## Get SQL table in pandas DataFrame
+        df = pd.read_sql(
+            sql="SELECT * FROM VideoIndexerIDs",
+            con=conn
+        )
+    return dict(
+        zip(
+            df.VideoID,
+            df.FileURL
+        )
+    )
+
 def representsInt(s):
     try: 
         int(s)
         return True
     except ValueError:
         return False
+
+def get_container_from_URL(fileURL):
+    return fileURL.split("/")[3]
+
+def get_file_name_from_URL(fileURL):
+    return "/".join(fileURL.split("/")[4:])
+
+def get_url_container_and_file_name(fileURL):
+    return get_container_from_URL(fileURL),get_file_name_from_URL(fileURL)

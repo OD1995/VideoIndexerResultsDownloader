@@ -2,7 +2,14 @@ import logging
 import requests
 import azure.functions as func
 import json
-from MyFunctions import get_vid_name_info, sqlise_tl, create_sql_query, run_sql_query
+from MyFunctions import (
+    get_vid_name_info,
+    sqlise_tl,
+    create_sql_query,
+    run_sql_query,
+    get_VideoIndexerIDs_dict,
+    get_url_container_and_file_name
+)
 from MyClasses import VideoIndexer
 import os
 
@@ -17,6 +24,26 @@ def main(req: func.HttpRequest) -> func.HttpResponse:
     ## Only do stuff if the video has been processed
     if videoState != "Processed":
         logging.info("File not processed")
+
+        if videoState == "Failed":
+            try:
+                ## Get fileURL for the Video Indexer ID
+                fileURL = get_VideoIndexerIDs_dict()[videoID]
+                ## If process failed, trigger the upload again
+                container,blob = get_url_container_and_file_name(fileURL)
+                data = {
+                    'fileUrl' : fileURL,
+                    'container' : container,
+                    'blob' : blob
+                }
+                r = requests.post(
+                    "https://futuresvideoindexeruploader.azurewebsites.net/api/HttpTrigger",
+                    params=data
+                )
+                logging.info("sent off URL to go through VI again")
+            except IndexError:
+                logging.info("Video Indexer ID not in the VideoIndexerIDs SQL table")
+
     else:
         ## Create VideoIndexer object
         vi = VideoIndexer(
@@ -32,22 +59,32 @@ def main(req: func.HttpRequest) -> func.HttpResponse:
         ## Get response
         js = json.loads(r.text)
         ## Get info from json
-        transcript_list = js['videos'][0]['insights']['transcript']
+        transcript_list_all = js['videos'][0]['insights']['transcript']
+        ## Split transcript_list_all into lists of 500 (max insert is 1000)
+        n = 500
+        transcript_list_blocks = [
+            transcript_list_all[i * n:(i + 1) * n]
+            for i in range((len(transcript_list_all) + n - 1) // n )
+        ]
         videoName = js['name']
         origVideoName,videoNumber = get_vid_name_info(videoName)
         videoAdded = js['created']
-        ## Convert to SQLised list of lists
-        listOfStringRows = sqlise_tl(
-            transcript_list=transcript_list,
-            videoName=videoName,
-            origVideoName=origVideoName,
-            videoAdded=videoAdded,
-            videoNumber=videoNumber
-        )
-        logging.info("listOfStringRows created")
-        ## Create SQL query to run
-        sqlQuery = create_sql_query(readyForSQL=listOfStringRows)
-        logging.info("sqlQuery created")
-        ## Run (INSERT) query
-        run_sql_query(sqlQuery)
-        logging.info("sqlQuery run")
+        logging.info(f"{len(transcript_list_blocks)} insert command to run")
+        for transcript_list in transcript_list_blocks:
+            ## Convert to SQLised list of lists
+            listOfStringRows = sqlise_tl(
+                transcript_list=transcript_list,
+                videoName=videoName,
+                origVideoName=origVideoName,
+                videoAdded=videoAdded,
+                videoNumber=videoNumber
+            )
+            logging.info("listOfStringRows created")
+            ## Create SQL query to run
+            sqlQuery = create_sql_query(readyForSQL=listOfStringRows)
+            logging.info("sqlQuery created")
+            ## Run (INSERT) query
+            run_sql_query(sqlQuery)
+            logging.info("sqlQuery run")
+
+    return func.HttpResponse("done")
