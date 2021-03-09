@@ -157,20 +157,37 @@ def run_sql_query(query):
             cursor.execute(query)
             logging.info("'INSERT' query executed")
 
-def get_VideoIndexerIDs_dict():
+def get_query_to_df(
+    query
+):
     connectionString = get_connection_string()
     with pyodbc.connect(connectionString) as conn:
         ## Get SQL table in pandas DataFrame
         df = pd.read_sql(
-            sql="SELECT * FROM VideoIndexerIDs",
+            sql=query,
             con=conn
         )
+    return df
+
+def get_VideoIndexerIDs_dict():
+    df = get_query_to_df(
+        query="SELECT * FROM VideoIndexerIDs"
+    )
     return dict(
         zip(
             df.VideoID,
             df.FileURL
         )
     )
+
+
+def get_VideoIndexerUploads_rows(
+    fileURL
+):
+    return get_query_to_df(
+        query=f"SELECT * FROM VideoIndexerUploads WHERE FileURL = '{fileURL}'"
+    )
+
 
 def representsInt(s):
     try: 

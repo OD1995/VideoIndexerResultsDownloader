@@ -8,7 +8,8 @@ from MyFunctions import (
     create_sql_query,
     run_sql_query,
     get_VideoIndexerIDs_dict,
-    get_url_container_and_file_name
+    get_url_container_and_file_name,
+    get_VideoIndexerUploads_rows
 )
 from MyClasses import VideoIndexer
 import os
@@ -29,18 +30,30 @@ def main(req: func.HttpRequest) -> func.HttpResponse:
             try:
                 ## Get fileURL for the Video Indexer ID
                 fileURL = get_VideoIndexerIDs_dict()[videoID]
-                ## If process failed, trigger the upload again
-                container,blob = get_url_container_and_file_name(fileURL)
-                data = {
-                    'fileUrl' : fileURL,
-                    'container' : container,
-                    'blob' : blob
-                }
-                r = requests.post(
-                    "https://futuresvideoindexeruploader.azurewebsites.net/api/HttpTrigger",
-                    params=data
-                )
-                logging.info("sent off URL to go through VI again")
+                ## Check how many times it has been uploaded already (max 3)
+                viuDF = get_VideoIndexerUploads_rows(fileURL)
+                if len(viuDF) < 3:
+                    ## If process failed, trigger the upload again
+                    container,blob = get_url_container_and_file_name(fileURL)
+                    data = {
+                        'fileUrl' : fileURL,
+                        'container' : container,
+                        'blob' : blob
+                    }
+                    r = requests.post(
+                        "https://futuresvideoindexeruploader.azurewebsites.net/api/HttpTrigger",
+                        params=data
+                    )
+                    logging.info("sent off URL to go through VI again")
+                else:
+                    ## Add row to AzureProblems table
+                    apQ = f"""
+                    INSERT INTO AzureProblems (ProblemArea,ProblemDetails)
+                    VALUES ('VideoIndexerUploaderMaxRetry','{fileURL}')
+                    """
+                    run_sql_query(apQ)
+                    logging.info("File has been uploaded too many times already, row added to AzureProblems")
+
             except IndexError:
                 logging.info("Video Indexer ID not in the VideoIndexerIDs SQL table")
 
